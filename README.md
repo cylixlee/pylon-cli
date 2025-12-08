@@ -58,12 +58,19 @@ Pylon supports two types of scripts:
 └── backup.py         # Script name: "backup"
 ```
 
-**User Project Script:**
+**User Project Scripts (two example projects):**
 ```
-~/.pylon/myproject/
-├── pyproject.toml    # Project configuration
-├── task1.py          # Script name: "task1" (has its own virtual environment)
-└── task2.py          # Script name: "task2" (has its own virtual environment)
+~/.pylon/
+├── greet.py          # Simple script: "greet"
+├── backup.py         # Simple script: "backup"
+├── project1/         # Project directory
+│   ├── pyproject.toml    # Project configuration
+│   ├── task1.py          # Script name: "task1" (shares virtual environment with task2)
+│   └── task2.py          # Script name: "task2" (shares virtual environment with task1)
+└── project2/         # Another project directory
+    ├── pyproject.toml    # Project configuration
+    ├── analyze.py        # Script name: "analyze" (shares virtual environment with report.py)
+    └── report.py         # Script name: "report" (shares virtual environment with analyze.py)
 ```
 
 ### Script Discovery
@@ -72,7 +79,7 @@ Pylon discovers scripts in two locations: the current project directory and the 
 
 In the current project directory, Pylon looks for `.py` files. If a `pyproject.toml` file exists in the current directory, all `.py` files are treated as project scripts and share a common virtual environment managed by the project dependencies.
 
-In the user scripts directory, Pylon looks for both simple scripts (`.py` files directly in `~/.pylon`) and project scripts (directories containing `pyproject.toml` and `.py` files). For project scripts in the user directory, each `.py` file is treated as a separate script with its own virtual environment.
+In the user scripts directory, Pylon looks for both simple scripts (`.py` files directly in `~/.pylon`) and project scripts (directories containing `pyproject.toml` and `.py` files). For project scripts in the user directory, all `.py` files in the same project directory share a common virtual environment.
 
 ### Virtual Environment Management
 
