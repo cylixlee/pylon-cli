@@ -53,7 +53,7 @@ def usage() -> None:
     print(f"  2. User scripts directory ({USER_SCRIPTS_ROOT})")
     print("and runs the first script with the following args.")
     print("")
-    print("Availavle scripts:")
+    print("Available scripts:")
     for entry in os.scandir(PROJECT_SCRIPTS_ROOT):
         if entry.is_file() and entry.name.endswith(".py"):
             print("  -", colorama.Fore.CYAN + entry.name[:-3], f"(project, {entry.path})")
