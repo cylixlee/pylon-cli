@@ -1,51 +1,46 @@
-import os
-import subprocess
 import sys
 
 import colorama
 
-TAG_RUNTIME = "RUNTIME"
-TAG_SCRIPT = " SCRIPT"
-
-USER_SCRIPTS_ROOT = os.path.abspath(os.path.join(os.path.expanduser("~"), ".pylon"))
-PROJECT_SCRIPTS_ROOT = os.path.abspath(".")
+from . import PROJECT_SCRIPTS_ROOT, TAG_ERROR, TAG_SCRIPT, USER_SCRIPTS_ROOT
+from .script import Script, discover_project_scripts, discover_user_scripts
 
 
 def main() -> None:
     colorama.init(autoreset=True)
 
-    # No script specified
-    if len(sys.argv) == 1:
-        usage()
-        return
-
-    # Script specified but not found
-    path = search_scripts_root(PROJECT_SCRIPTS_ROOT, sys.argv[1])
-    if path is None and os.path.exists(USER_SCRIPTS_ROOT):
-        path = search_scripts_root(USER_SCRIPTS_ROOT, sys.argv[1])
-    if path is None:
-        usage()
-        return
-
-    # Run script
-    print(colorama.Fore.CYAN + TAG_RUNTIME, f"Python {sys.version}")
-    print(colorama.Fore.GREEN + TAG_SCRIPT, f"{sys.argv[1]} ({path})")
+    # Discover scripts
     try:
-        syscall(sys.executable, path, *sys.argv[2:])
-    except Exception:  # we're not responsible for the exception thrown by failures of the script
-        pass
+        project_scripts = discover_project_scripts(PROJECT_SCRIPTS_ROOT)
+        user_scripts = discover_user_scripts(USER_SCRIPTS_ROOT)
+    except ValueError as e:
+        print(colorama.Fore.RED + TAG_ERROR, str(e))
+        sys.exit(1)
+
+    # Print usage if no script name is provided
+    if len(sys.argv) == 1:
+        usage(project_scripts, user_scripts)
+        return
+
+    # Find target script in discovered scripts
+    script_name = sys.argv[1]
+    if script_name in project_scripts:
+        script_info = project_scripts[script_name]
+    elif script_name in user_scripts:
+        script_info = user_scripts[script_name]
+    else:
+        usage(project_scripts, user_scripts)  # print usage if not found
+        return
+
+    # Print info and run script
+    print(colorama.Fore.GREEN + TAG_SCRIPT, f"{script_name} ({script_info.path})")
+    try:
+        script_info.run(sys.argv[2:])
+    except Exception as e:
+        print(colorama.Fore.RED + TAG_ERROR, str(e))
 
 
-def search_scripts_root(root: str, name: str) -> str | None:
-    script_name = f"{name}.py"
-    for entry in os.scandir(root):
-        if not entry.is_file():
-            continue
-        if entry.name == script_name:
-            return entry.path
-
-
-def usage() -> None:
+def usage(project_scripts: dict[str, Script], user_scripts: dict[str, Script]) -> None:
     print(colorama.Fore.RED + "Usage: pylon <script-name> [args...]")
     print("")
     print("Pylon is a script runner that searches for scripts in the following order:")
@@ -54,15 +49,19 @@ def usage() -> None:
     print("and runs the first script with the following args.")
     print("")
     print("Available scripts:")
-    for entry in os.scandir(PROJECT_SCRIPTS_ROOT):
-        if entry.is_file() and entry.name.endswith(".py"):
-            print("  -", colorama.Fore.CYAN + entry.name[:-3], f"(project, {entry.path})")
-    if os.path.exists(USER_SCRIPTS_ROOT):
-        for entry in os.scandir(USER_SCRIPTS_ROOT):
-            if entry.is_file() and entry.name.endswith(".py"):
-                print("  -", colorama.Fore.CYAN + entry.name[:-3], f"(user, {entry.path})")
+
+    for name, info in sorted(project_scripts.items()):
+        location = "project" if info.project_dir is None else "project-dir"
+        print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
+
+    for name, info in sorted(user_scripts.items()):
+        location = "user" if info.project_dir is None else "user-dir"
+        print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
+
+    if not project_scripts and not user_scripts:
+        print("  No scripts found.")
     print("")
 
 
-def syscall(*command: str, shell: bool = False) -> None:
-    _ = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr, shell=shell)
+if __name__ == "__main__":
+    main()

@@ -7,6 +7,9 @@ authors = [{ name = "Cylix Lee", email = "cylix.lee@outlook.com" }]
 requires-python = ">=3.13"
 dependencies = ["colorama>=0.4.6"]
 
+[dependency-groups]
+dev = ["mypy>=1.19.0"]
+
 [project.scripts]
 pylon = "pylon_cli.main:main"
 
@@ -16,3 +19,6 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
+
+[tool.basedpyright]
+typeCheckingMode = "off"
