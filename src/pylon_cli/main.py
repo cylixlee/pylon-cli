@@ -1,4 +1,6 @@
+import shutil
 import sys
+import textwrap
 
 import colorama
 
@@ -40,6 +42,26 @@ def main() -> None:
         print(colorama.Fore.RED + TAG_ERROR, str(e))
 
 
+def wrap_text(text: str, width: int, indent: int = 6) -> list[str]:
+    """Wrap text to specified width with indentation, preserving paragraphs"""
+    result = []
+    paragraphs = text.strip().split("\n\n")
+    for paragraph in paragraphs:
+        lines = paragraph.strip().split("\n")
+        cleaned_lines = []
+        for line in lines:
+            cleaned_line = " ".join(line.strip().split())
+            if cleaned_line:
+                cleaned_lines.append(cleaned_line)
+        paragraph_text = " ".join(cleaned_lines)
+        wrapped_lines = textwrap.wrap(paragraph_text, width=width - indent)
+        for line in wrapped_lines:
+            result.append(f"{' ' * indent}{line}")
+        if paragraph != paragraphs[-1]:
+            result.append("")
+    return result
+
+
 def usage(project_scripts: dict[str, Script], user_scripts: dict[str, Script]) -> None:
     print(colorama.Fore.RED + "Usage: pylon <script-name> [args...]")
     print("")
@@ -50,25 +72,25 @@ def usage(project_scripts: dict[str, Script], user_scripts: dict[str, Script]) -
     print("")
     print("Available scripts:")
 
+    terminal_width = shutil.get_terminal_size().columns
+
     for name, info in sorted(project_scripts.items()):
         location = "project" if info.project_dir is None else "project-dir"
         print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
         if info.docstring:
-            # Split docstring into lines and indent each line
-            lines = info.docstring.strip().split("\n")
-            for line in lines:
-                print(f"      {line.strip()}")
-            print()
+            # Wrap docstring to terminal width
+            wrapped_lines = wrap_text(info.docstring, terminal_width)
+            for line in wrapped_lines:
+                print(line)
 
     for name, info in sorted(user_scripts.items()):
         location = "user" if info.project_dir is None else "user-dir"
         print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
         if info.docstring:
-            # Split docstring into lines and indent each line
-            lines = info.docstring.strip().split("\n")
-            for line in lines:
-                print(f"      {line.strip()}")
-            print()
+            # Wrap docstring to terminal width
+            wrapped_lines = wrap_text(info.docstring, terminal_width)
+            for line in wrapped_lines:
+                print(line)
 
     if not project_scripts and not user_scripts:
         print("  No scripts found.")

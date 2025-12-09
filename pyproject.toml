@@ -1,6 +1,6 @@
 [project]
 name = "pylon-cli"
-version = "0.4.0"
+version = "0.4.1"
 description = "Pylon: Command-Line Improvements"
 readme = "README.md"
 authors = [{ name = "Cylix Lee", email = "cylix.lee@outlook.com" }]
