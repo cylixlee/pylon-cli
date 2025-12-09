@@ -53,10 +53,22 @@ def usage(project_scripts: dict[str, Script], user_scripts: dict[str, Script]) -
     for name, info in sorted(project_scripts.items()):
         location = "project" if info.project_dir is None else "project-dir"
         print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
+        if info.docstring:
+            # Split docstring into lines and indent each line
+            lines = info.docstring.strip().split("\n")
+            for line in lines:
+                print(f"      {line.strip()}")
+            print()
 
     for name, info in sorted(user_scripts.items()):
         location = "user" if info.project_dir is None else "user-dir"
         print("  -", colorama.Fore.CYAN + name, f"({location}, {info.path})")
+        if info.docstring:
+            # Split docstring into lines and indent each line
+            lines = info.docstring.strip().split("\n")
+            for line in lines:
+                print(f"      {line.strip()}")
+            print()
 
     if not project_scripts and not user_scripts:
         print("  No scripts found.")

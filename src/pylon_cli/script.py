@@ -1,15 +1,51 @@
+import ast
 import enum
 import hashlib
 import os
 import shutil
 import sys
+import tomllib
 import venv
 
 import colorama
 
-from . import TAG_RUNTIME, TAG_VENV, VENV_ROOT, syscall
+from . import TAG_RUNTIME, VENV_ROOT, syscall
 
 __all__ = ["Script", "ScriptKind", "discover_user_scripts", "discover_project_scripts"]
+
+TAG_VENV = "   VENV"
+
+
+def extract_docstring(file_path: str) -> str | None:
+    """
+    Extract docstring from a Python file.
+    """
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Look for triple-quoted string at the beginning of the file
+    try:
+        tree = ast.parse(content)
+        if tree.body and isinstance(tree.body[0], ast.Expr):
+            if isinstance(tree.body[0].value, ast.Constant):
+                docstring = tree.body[0].value.value
+                if isinstance(docstring, str):
+                    return docstring.strip()
+    except (SyntaxError, ValueError):
+        pass  # No docstring found
+    return None
+
+
+def extract_description(pyproject_path: str) -> str:
+    """
+    Extract description from pyproject.toml
+    """
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+            return data.get("project", {}).get("description")
+    except Exception:
+        pass
 
 
 class ScriptKind(enum.Enum):
@@ -24,13 +60,22 @@ class Script(object):
     path: str
     kind: ScriptKind
     project_dir: str | None
+    docstring: str | None
     _venv_path: str | None
 
-    def __init__(self, name: str, path: str, kind: ScriptKind, project_dir: str | None = None):
+    def __init__(
+        self,
+        name: str,
+        path: str,
+        kind: ScriptKind,
+        project_dir: str | None = None,
+        docstring: str | None = None,
+    ):
         self.name = name
         self.path = path
         self.kind = kind
         self.project_dir = project_dir
+        self.docstring = docstring
         self._venv_path = None
 
     def run(self, args: list[str]) -> None:
@@ -95,16 +140,26 @@ def discover_user_scripts(root: str) -> dict[str, Script]:
                 name = entry.name[:-3]
                 if name in scripts:
                     raise ValueError(f"Duplicate script name '{name}'")
-                scripts[name] = Script(name, entry.path, ScriptKind.SIMPLE)
+                docstring = extract_docstring(entry.path)
+                scripts[name] = Script(name=name, path=entry.path, kind=ScriptKind.SIMPLE, docstring=docstring)
         elif entry.is_dir():
-            if not os.path.exists(os.path.join(entry.path, "pyproject.toml")):
+            project_toml = os.path.join(entry.path, "pyproject.toml")
+            if not os.path.exists(project_toml):
                 continue
+            project_description = extract_description(project_toml)
+
             for file_entry in os.scandir(entry.path):
                 if file_entry.is_file() and file_entry.name.endswith(".py"):
                     name = file_entry.name[:-3]
                     if name in scripts:
                         raise ValueError(f"Duplicate script name '{name}'")
-                    scripts[name] = Script(name, file_entry.path, ScriptKind.PROJECT, entry.path)
+                    scripts[name] = Script(
+                        name=name,
+                        path=file_entry.path,
+                        kind=ScriptKind.PROJECT,
+                        project_dir=entry.path,
+                        docstring=project_description,
+                    )
     return scripts
 
 
@@ -113,6 +168,12 @@ def discover_project_scripts(root: str) -> dict[str, Script]:
     if not os.path.exists(root):
         return scripts
     has_pyproject = os.path.exists(os.path.join(root, "pyproject.toml"))
+
+    # Extract project description if pyproject.toml exists
+    project_description = None
+    if has_pyproject:
+        project_description = extract_description(os.path.join(root, "pyproject.toml"))
+
     for entry in os.scandir(root):
         if not entry.is_file():
             continue
@@ -122,5 +183,14 @@ def discover_project_scripts(root: str) -> dict[str, Script]:
                 raise ValueError(f"Duplicate script name '{name}'")
             script_type = ScriptKind.PROJECT if has_pyproject else ScriptKind.SIMPLE
             project_dir = root if has_pyproject else None
-            scripts[name] = Script(name, entry.path, script_type, project_dir)
+
+            # For simple scripts, extract docstring from file
+            # For project scripts, use project description
+            docstring = None
+            if has_pyproject:
+                docstring = project_description
+            else:
+                docstring = extract_docstring(entry.path)
+
+            scripts[name] = Script(name, entry.path, script_type, project_dir, docstring)
     return scripts
